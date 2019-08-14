@@ -1,4 +1,4 @@
 # dog-sitter
 projet ODC
 
-cool readme
+Station pour chien + collier connecté
