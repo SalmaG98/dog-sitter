@@ -41,14 +41,22 @@ PubSubClient client(MQTTclient);
 
 //Tasks
 TaskHandle_t Sending_Data_task;
-boolean once = true;
+TaskHandle_t Sending_GPS_task;
+
 
 //JSON
 String Collar_History;
-StaticJsonDocument<256> doc;
-JsonObject collarHistory = doc.to<JsonObject>();
-JsonObject position = collarHistory.createNestedObject("position");
-char buffer[512];
+StaticJsonDocument<500> doc;
+//JsonObject collarHistory = doc.to<JsonObject>();
+//JsonObject position = collarHistory.createNestedObject("position");
+char buffer[700];
+int ax=0,ay=0,az=0,gx=0,gy=0,gz=0;
+int BPM=0,temp=0;
+unsigned long chipid;  
+
+StaticJsonDocument<100> state;
+float battery;
+
 
 void callback(char* topic, byte* payload, unsigned int length) 
   {
@@ -91,38 +99,45 @@ void Sending_Data(void *pvParameters)
 
             //JSON
 
-            collarHistory["date"] = timeClient.getEpochTime();
-
-
-            position["x"] = random(1000, 100000) / 100.0;
-            position["y"] = random(1000, 100000) / 100.0;
-
-            collarHistory["pulse"] = random(100);
-            collarHistory["temperature"] = random(55);
-
             client.loop();
-
-            serializeJson(doc, buffer);
-            client.publish(channelName, buffer); // Publish message.
-            delay(1000);
-          }  
+   
+           DeserializationError err = deserializeJson(doc,Serial);
+           if (!err) {
+             
+             doc["ID"]= chipid;
+             doc["D"]=timeClient.getEpochTime();
+             state["rssi"]=WiFi.RSSI();
+             state["battery"]=100;
+             state["date"]=timeClient.getEpochTime();
+             state["id"]= chipid;
+             //serializeJson(doc,Serial);
+             //Serial.println();
+             serializeJson(doc,buffer);
+             client.publish("oprex/collarHistory",buffer);
+             serializeJson(state,buffer);
+             client.publish("oprex/collarState",buffer);
+             
+           }
+              
       }
   }
 
-
+void Sending_GPS(void *pvParameters)
+{
+  Serial.println("GPS");
+}
 
 
 
 void setup() 
   {
       
-    Serial.begin(115200);
+    Serial.begin(9600);
     pinMode(MICROPHONE_PIN, INPUT);
     WiFi.begin(ssid, password); // Connect to WiFi.
       if (WiFi.waitForConnectResult() != WL_CONNECTED) 
         {
           Serial.println("Couldn't connect to WiFi.");
-          while (1) delay(100);
         }
       else
         {
@@ -137,13 +152,21 @@ void setup()
     client.setCallback(callback);
     lastReconnectAttempt = 0; 
     lastRead = micros();
-    xTaskCreatePinnedToCore(Sending_Data,"Data_Sending",2500,NULL,1,&Sending_Data_task,1);
+    xTaskCreatePinnedToCore(Sending_Data,"Data_Sending",2500,NULL,1,&Sending_Data_task,0);
     delay(500); 
-    
+    xTaskCreatePinnedToCore(Sending_GPS,"GPS_Sending",2500,NULL,1,&Sending_GPS_task,0);
+    delay(500);
+    vTaskSuspend(Sending_GPS_task);
+    chipid=ESP.getEfuseMac();
   }
     
 
 void loop() {
+
+    
+    if(WiFi.status() == WL_CONNECTED)
+    {
+    //vTaskResume(Sending_Data_task);
     checkClient = audioServer.available();
     if (checkClient.connected()) {
         audioClient = checkClient; 
@@ -152,6 +175,12 @@ void loop() {
     //listen for 100ms, taking a sample every 125us,
     //and then send that chunk over the network.
     listenAndSend(100);
+    }
+    else
+    {
+      vTaskSuspend(Sending_Data_task);
+      vTaskResume(Sending_GPS_task);
+    }
 }
 
 
@@ -233,7 +262,7 @@ void sendAudio(void) {
 //            Serial.print(val);
 //            Serial.print(',');
         }
-        Serial.println("DONE");
+        //Serial.println("DONE");
     }
 }
 
