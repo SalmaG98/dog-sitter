@@ -10,8 +10,8 @@ float temp=0 ;
 
 #include <Wire.h> //Include the Wire.h library so we can communicate with the gyro
 int gyro_address;
-int acc_axis[4], gyro_axis[4];
-double gyro_axis_cal[4];
+int acc_axis[3], gyro_axis[3];
+double gyro_axis_cal[3], acc_axis_cal[3];
 int temperature;
 
 int ax,ay,az,gx,gy,gz;
@@ -62,6 +62,28 @@ void setup(){
     Wire.endTransmission();                                      //End the transmission with the gyro
 
   delay(250);                                        //Give the gyro time to start
+
+    //Serial.print("Starting calibration...");           //Print message
+  for (int cal_int = 0; cal_int < 2000 ; cal_int ++){    //Take 2000 readings for calibration
+    gyro_signalen();                                 //Read the gyro output
+    gyro_axis_cal[0] += gyro_axis[0];                        //Ad roll value to gyro_roll_cal.
+    gyro_axis_cal[1] += gyro_axis[1];                        //Ad pitch value to gyro_pitch_cal.
+    gyro_axis_cal[2] += gyro_axis[2];                        //Ad yaw value to gyro_yaw_cal
+    acc_axis_cal[0] += acc_axis[0];                        //Ad roll value to gyro_roll_cal.
+    acc_axis_cal[1] += acc_axis[1];                        //Ad pitch value to gyro_pitch_cal.
+    acc_axis_cal[2] += acc_axis[2];                        //Ad yaw value to gyro_yaw_cal
+    if(cal_int%100 == 0)//Serial.print(".");           //Print a dot every 100 readings
+    delay(4);                                        //Wait 4 milliseconds before the next loop
+  }
+  //Now that we have 2000 measures, we need to devide by 2000 to get the average gyro offset
+  //Serial.println(" done!");                          //2000 measures are done!
+   gyro_axis_cal[0] /= 2000;                                                         //Divide the roll total by 2000.
+   gyro_axis_cal[1] /= 2000;                                                         //Divide the pitch total by 2000.
+   gyro_axis_cal[2] /= 2000;
+   acc_axis_cal[0] /= 2000;                                                         //Divide the roll total by 2000.
+   acc_axis_cal[1] /= 2000;                                                         //Divide the pitch total by 2000.
+   acc_axis_cal[2] /= 2000;
+    
     pinMode(pulsePin,INPUT);         // pin that will blink to your heartbeat!
     interruptSetup();
     pinMode(input , INPUT) ; 
@@ -72,16 +94,16 @@ void loop(){
 
   StaticJsonDocument<150> doc;
   //JsonObject Sensors = doc.to<JsonObject>();
-  JsonArray Agitation = doc.createNestedArray("Agitation");
+  JsonArray Agitation = doc.createNestedArray("A");
 
       gyro_signalen();   //Read the gyro signals
       //Your offsets:  -638  -61 1713  -159  -18 48
-      ax = acc_axis[1];//+638;
-      ay = acc_axis[2];//+61;
-      az = acc_axis[3]-4090;
-      gx = gyro_axis[1];//+159;
-      gy = gyro_axis[2];//+18;
-      gz = gyro_axis[3];//-48;
+      ax = acc_axis[0] - acc_axis_cal[0];//+638;
+      ay = acc_axis[1] - acc_axis_cal[1];//+61;
+      az = acc_axis[2] - acc_axis_cal[2];
+      gx = gyro_axis[0] - gyro_axis_cal[0];//+159;
+      gy = gyro_axis[1] - gyro_axis_cal[0];//+18;
+      gz = gyro_axis[2] - gyro_axis_cal[0];//-48;
 
       reading  = analogRead(input);
       temp = (reading * (5.0/1024))*100 - 2.5 ; 
@@ -108,13 +130,13 @@ void gyro_signalen(){
     Wire.endTransmission();                                      //End the transmission.
     Wire.requestFrom(gyro_address,14);                           //Request 14 bytes from the gyro.
     while(Wire.available() < 14);                                //Wait until the 14 bytes are received.
-    acc_axis[1] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_x variable.
-    acc_axis[2] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_y variable.
-    acc_axis[3] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_z variable.
+    acc_axis[0] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_x variable.
+    acc_axis[1] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_y variable.
+    acc_axis[2] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_z variable.
     temperature = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the temperature variable.
+    gyro_axis[0] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
     gyro_axis[1] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
     gyro_axis[2] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
-    gyro_axis[3] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
              
 }
 
