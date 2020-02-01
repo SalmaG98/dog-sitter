@@ -24,8 +24,8 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
 //Connecting_WIFI_MQTT
-const char* ssid     = "El FabSpace Lac";
-const char* password = "Think_Make_Share";
+const char* ssid     = "Orange-2";
+const char* password = "22223333";
 const char* mqttServer = "broker.hivemq.com";
 const int mqttPort = 1883;
 const char* clientID = "24727054";
@@ -138,7 +138,7 @@ void Sending_Data(void *pvParameters)
 void setup() 
   {
       
-    Serial.begin(9600);
+    Serial.begin(4800);
     pinMode(MICROPHONE_PIN, INPUT);
     WiFi.begin(ssid, password); // Connect to WiFi.
       if (WiFi.waitForConnectResult() != WL_CONNECTED) 
